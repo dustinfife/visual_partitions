@@ -1,0 +1,4 @@
+"0","d2 = d %>% "
+"0","  mutate(CESD = sqrt(CESD), Health = sqrt(Health))"
+"0","a = flexplot(CESD~Internet|Religion + Health, data=d2, method=""quadratic"")"
+"0","a"

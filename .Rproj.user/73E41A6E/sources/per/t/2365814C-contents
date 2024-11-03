@@ -1,0 +1,796 @@
+---
+title: "Visual Partitions"
+shorttitle: "Visual Partitions"
+author: 
+  - name      : "Dustin A. Fife"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    address       : "201 Mullica Hill Road
+                    Glassboro, NJ 08028"
+    email         : "fife.dustin@gmail.com"
+  - name      : "Jorge L. Mendoza"
+    affiliation   : "2"
+
+affiliation:
+  - id            : "1"
+    institution   : "Rowan University"
+  - id            : "2"
+    institution   : "University of Oklahoma"    
+abstract: |
+  Researchers routinely utlize multiple predictor variables and summarize their results using ANOVA summary tables. These tables are uninformative and often misleading. They fail to show the nature of main effects (e.g., size and direction) and interaction effects, and they also make it hard to assess the viability of the statistical model. A better approach is to use what we call "visual partitions," which are intuitive, succinct visual representations of the statistical model. These partitions (and the rules associated with them) allow us to identify when effects can be partitioned into relatively independent visual representations. In this paper, we highlight when conditional inferences are contaminated by other features of the model and identify the conditions under which effects can be partitioned. We also reveal a strategy for partitioning effects into uncontaminated blocks using visualizations. This approach simplifies analyses immensely, without oversimplifying the analysis.
+documentclass     : "apa6"
+classoption       : "doc"
+output            : 
+  papaja::apa6_pdf:
+    number_sections: false
+figsintext     : true
+bibliography: 
+- all_references.bib
+header-includes:
+- \usepackage{amsmath}
+- \usepackage{tikz}
+- \usetikzlibrary{shapes.geometric,arrows, positioning}
+- \usepackage[LGRgreek]{mathastext}
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, note=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE, note=FALSE, cache=TRUE)
+options(tinytex.verbose = TRUE)
+options(knitr.kable.NA = '')
+require(tidyverse)
+require(flexplot)
+```
+
+# Introduction
+
+Suppose we were to peruse our favorite journal and find the results shown in Table \@ref(tab:anovatab). This table presents the results of a model where suicide ideation is modeled from stress, health, depression, and the suicide ideation of one's best friend. Further suppose these results are highly related to our area of expertise. As such, we have great interest in understanding how these variables relate to suicide ideation. How are we to make sense of these results? Does increasing health reduce suicide ideation? Or does it increase it? How about stress? The model suggests a nonlinear effect between stress and suicide ideation, but what is the nature of that effect? And what of the interaction? In what way do friend ideation and depression interact?
+  
+```{r anovatab}
+require(flexplot)
+require(tidyverse)
+require(patchwork)
+mod = lm(ideation~stress + I(stress^2) + health + friend_ideation * depression, data=ideation)
+aovtab = data.frame(anova(mod))
+aovtab$F.value = round(aovtab$F.value, digits=2)
+row.names(aovtab) = gsub("friend_ideation", "friend ideation", row.names(aovtab))
+row.names(aovtab)[6] = "friend ideation $ \\times $ depression"
+row.names(aovtab)[2] = "$\\text{stress}^2$"
+aovtab$Pr..F. = scales::pvalue(aovtab$Pr..F.)
+aovtab$F.value[7] = ""
+aovtab$Pr..F.[7] = ""
+papaja::apa_table(aovtab, 
+  caption = "ANOVA Summary Table of the Suicide Ideation Analysis", 
+  digits=2, row.names=T, 
+  escape=FALSE,
+  align = c("l", rep("c", times=ncol(aovtab))),
+  col.names = c("", "DF", "SS", "MS", "F", "p"))
+```
+
+Unfortunately, an ANOVA summary table cannot answer these questions. Alas, ANOVA summary tables are painfully uninformative. Even if we were to know the direction of the main effects and the nature of the interaction/nonlinear effects, there's still the multivariate nature of the data to content with.[^multivariate] These predictors were fit in one multivariate model. Can we interpret the main effects in isolation? If not, how do we interpret main effects multivariately? And what of the nonlinear effects? In short, how do we interpret the whole of the multivariate model without introducing bias in our interpretation?
+
+[^multivariate]: Technically, the term "multivariate" means there are multiple *dependent* variables. However, the term is frequently (mis)used to describe situations where multiple *independent* variables are used. The latter situation is generally referred to as "multiple regression." However, that too is easy to misunderstand, since many assume multiple regression is used only when one has multiple numeric predictors [@Cohen1968]. This is incorrect; multiple regression can be used to model categorical predictors. As such multiple regression subsumes factorial ANOVAs and ANCOVAs. However, in this paper, we adopt the nomenclature of nonstatisticians since it is arguably more common. As such, we use the term "multivariate" to refer to situations where the researcher has multiple independent variables.
+
+It turns out, the answer to that question is quite simple and requires the use of simple visualizations we call "visual partitions." Visual partitions are supplements (or, perhaps, replacements) of the traditional ANOVA summary table. Visual partitions succinctly communicate the *entirety* of a multivariate model without introducing bias in interpretation. This approach helps identify which effects can be interpreted in independent visuals and which must be interpreted together. 
+  
+However, before we introduce the visual partitions approach, we must introduce several visualization tools we will use throughout this manuscript. Subsequently, we will identify the rules and assumptions required to create visual partitions. Next, we show how visual partitions can be used for confirmatory research, then introduce a strategy for using visual partitions in exploratory research. We then conclude with an example and show how a visual partitions approach helps detect insights that would have been missed with traditional approaches. 
+
+# Visualization Tools 
+
+One critical component of the visual partitioning strategy is plotting nonlinear and/or interactive effects. (The reason these are critical will be explained in the following section). Visualizing nonlinear relationships is simple; one simply needs to utilize a scatterplot and (optionally) overlay a nonlinear line (e.g., quadratic, cubic spline, or loess line). 
+
+There are also many tools to visualize interaction effects. One approach is a "simple-slopes" analysis [@cohen_applied_2013], where the user picks a few relatively arbitrary points on the moderator (e.g., +1 SD, mean, and -1 SD), then shows the regression lines for the other predictor variable at each of these levels of the moderator. While this approach is both intuitive and easy to perform, it suffers from several weaknesses: the points chosen (i.e., $\pm$ 1 SD/mean) may occur where data are quite sparse [@Finsaas2020]; these plots do not show raw data, which makes it harder to assess model assumptions [@McCabe2018]; and the choice of which predictor variable is considered the moderator is arbitrary [@Finsaas2020]. Scholars have proposed alternative methods, including 3-D planes [@Finsaas2020; @cohen_applied_2013], the Johnson-Neyman technique [@Finsaas2020; @Johnson1936; @Bauer2005], and paneled plots [@McCabe2018]. Most of these methods are effective for the purposes for which they were designed, while many will not serve the purposes of this paper. For this paper, we will utilize three important tools: Flexplot, marginal plots, and partial residual plots. This graphical tools show raw data, are easy to interpret, and respect the multivariate nature of the data. We will discuss each of these in turn. 
+
+## Tool \#1: Flexplot
+
+The first tool we will utilize is Flexplot [@Fife2019c]. Flexplot was designed to provide an easy-to-use interface for statistical modeling. With one-line functions, users can visualize univariate, bivariate, and multivariate relationships. Flexplot is available as an R package [see @Fife2019c], as well as a point-and-click interface in both JASP [@JASPTeam2019; fife2021graph] and Jamovi [@Jamovi2018; Fife2019c]. 
+
+```{r flexplotexample, fig.cap="These plots show examples of Flexplot graphics. In the top image,  lines/colors/symbols.", fig.align="center", fig.width=7, fig.height=5.5, out.width="70%"}
+
+a = flexplot(ideation~friend_ideation | depression, data=ideation, method="lm") + labs(x="Friend's Suicide Ideation", y="Self Suicide Ideation")
+b = flexplot(ideation~depression + friend_ideation, data=ideation, method="lm") + labs(x="Depression", y="Self Suicide Ideation")
+require(patchwork)
+a+b + plot_layout(nrow=2)
+```
+
+In Flexplot, the foundation of nearly all graphics is a simple bivariate scatterplot. Additional variables are encoded using either separate panels or separate colors/symbols/lines. For example, Figure \@ref(fig:flexplotexample) shows the plots for the data displayed in Table \@ref(tab:anovatab). The top image shows encodes a second predictor as different panels, while the lower image encodes the second predictor as separate lines/colors/symbols. In both cases, the images reveal the nature of the interaction between friend ideation and depression: depression increases suicide ideation more when one's friends also are high in suicide ideation, relative to when one's friends are low in suicide ideation. 
+
+
+```{r flexplotequation, fig.cap="This image shows the suicide ideation data with a Flexplot graphic. Stress is shown on the $X$-axis, health is separated into bins and different values are shown as colors/symbols/lines, and friend ideation/depression are also binned and displayed in separate panels.", fig.align="center", fig.width=6, fig.height=4, out.width="75%"}
+flexplot(ideation~stress + health | friend_ideation + depression, data=ideation,
+         labels=list("friend_ideation" = c("low", "medium", "high"),
+                     "health_binned" = c("low", "medium", "high"),
+                     "depression" = c("low", "medium", "high"))) + 
+  labs(y="Suicide Ideation", x="Stress", color="Health", linetype="Health", shape="Health") + theme_bw()
+```
+
+When using Flexplot in R, relationships can be specified in R using a Flexplot equation of the following form: `y ~ a + b | c + d`. The variable `y` is displayed on the $Y$-axis, `a` is on the $X$-axis, `b` is displayed as separate colors/symbols/lines, `c` is shown in row panels, and `d` is shown in column panels. As an example, consider Figure \@ref(fig:flexplotequation), which plots the relationship between stress/depression/friend ideation and ideation. The command used to generate these data was `ideation~stress + health | friend_ideation + depression`. 
+
+Flexplot defaults to overlaying "loess" lines [@Cleveland1993], which are nonparametric smoothing functions that can bend with the data. The reason for this default is that loess lines will reveal any nonlinear relationships between the predictor and outcome variable. For example, Figure \@ref(fig:flexplotequation) reveals the nonlinear relationship between suicide ideation and stress: initially, increasing stress reduces ideation, but after around stress scores of 10, increasing stress increases suicide ideation, \
+
+Flexplot also makes it easy to identify interaction effects; interactions will show up as nonparallel lines across either panels or colors/lines/symbols. However, with so many panels it is easy to experience information overload and fail to identify patterns of nonparallel lines. The next tool, however, makes it easy to identify nonparallel lines in a Flexplot graphic. 
+
+## Tool \#2: Marginal Plots
+
+The second tool we will utilize is what we call a "marginal plot." These too are available in the R package `flexplot` (as of version 0.10).[^marginaleffects] Marginal plots make it easy to detect interactions. 
+
+[^marginaleffects]: Marginal plots are different than "marginal-effects plots" [@berry2012improving; @preachermargineffects], which plot the slope of $X$ against a moderator (e.g., $Z$).
+
+```{r threeinteractions1, fig.cap="This shows an example of a marginal plot where $X$ interacts with $Z$ only. The marginal plot shows non-parallel slopes across the columns.", fig.align="center", fig.width=6, fig.height=4, out.width="75%"}
+n = 1200
+x = rnorm(n)
+z = rnorm(n)
+w = rnorm(n)
+y1 = .3*x + .3*z + .3*w + .5*x*z + rnorm(n, 0, .5)
+y2 = .3*x + .3*z + .3*w + .5*x*w + rnorm(n, 0, .5)
+y3 = .3*x + .3*z + .3*w + .7*x*z*w + rnorm(n, 0, .5)#+ .5*x*z + .5*x*w + .5*w*z + rnorm(n, 0, .5)
+y4 = .3*x + .3*z + .3*w + .7*x*z*w + .5*x*z + .5*x*w + .5*w*z + rnorm(n, 0, .5)
+d = data.frame(x, w, z, y1, y2, y3, y4)
+a = marginal_plot(
+  flexplot(y1~x | z + w, data=d, method="lm", 
+                           labels=list("x" = c("low", "medium", "high"),
+                                       "z" = c("low", "medium", "high")
+                                       )) + 
+    labs(x="x", y="y", title="Interaction Between X and Z") )
+a
+```
+
+Recall that Flexplot allows one to plot multivariate relationships (as in Figure \@ref(fig:flexplotequation)). These plots can be used to detect interactions by identifying whether the slopes across each of the panels (or across the different lines/colors/symbols) are parallel. If the lines are not parallel, one of the variables (either the variable in the row panel, the variable in the column panel, or the variable represented as a color/line/symbol) interacts with the variable on the $X$-axis. More specifically, 
+
+* if lines systematically deviate from parallel as a function of the columns, the variable on the $X$-axis interacts with the variable in column panels
+* if lines systematically deviate from parallel as a function of the rows, the variable on the $X$-axis interacts with the variable in row panels
+* if lines systematically deviate from parallel as a function of the colors/lines/symbols, the variable on the $X$-axis interacts with the variable represented as a color/line/symbol
+* if lines systematically deviate from parallel as a function of rows and/or colors and/or columns, there's possibly a three or four-way interaction
+
+While the rules are simple, it becomes difficult to visually aggregate across panels (or colors/lines/symbols) using Flexplot alone. To assist with this visual aggregation, marginal plots produce three additional groups of plots: the plots above the Flexplot will show the average slope for each column panel, averaged across the row panels. The plots to the right of the Flexplot will show the average slope for each row panel, averaged across the column panels. The top-right plot will show the average slope for $X$, averaged across both rows and columns. (Unfortunately, marginal plots do not average across colors/symbols/lines). 
+
+```{r threeinteractions2, fig.cap="Example of a marginal plot where $X$ interacts with $W$ only. The marginal plot shows non-parallel slopes across the rows.", fig.align="center", fig.width=6, fig.height=4, out.width="75%"}
+marginal_plot(
+  flexplot(y2~x | z + w, data=d, method="lm", 
+           labels = list("x" = c("low", "medium", "high"),
+                "z" = c("low", "medium", "high")))
+           + theme_bw() + labs(x="x", y="y", title="Interaction Between X and W"))
+```
+
+Figures \@ref(fig:threeinteractions1)-\@ref(fig:threeinteractions3) shows examples of several of these conditions. The first plot (Figure \@ref(fig:threeinteractions1)) shows an interaction between $X$ and the variable in the column panels ($Z$). Notice that the row plots seem to be fairly parallel, while the column plots increase their slope as $Z$ increases. The second plot (Figure \@ref(fig:threeinteractions2)) shows an interaction between $X$ and the variable in the row panels ($W$). Now, the column plots are fairly parallel, while the row plots go from negative to positive. Finally, (Figure \@ref(fig:threeinteractions3)) shows a three-way interaction. Here, the marginal plots suggest the rows and columns are parallel. However, notice that, within the 9-panel grid of the raw data, the slopes are *not* parallel. For these particular data, the data were simulated to have a three-way interaction, but no two-way interactions. Alternatively, both the row and the column margins might be nonparallel, which might indicate the variables have both two-way and three-way interactions present. 
+
+```{r threeinteractions3, fig.cap="Example of a marginal plot where $X$ interacts with $W$ and $Z$. The marginal plot shows parallel slopes across the rows and panels, but the raw data in the 9x9 grid show nonparallel lines.", fig.align="center", fig.width=6, fig.height=4, out.width="75%"}
+a = marginal_plot(flexplot(y3~x | z + w, data=d, method="lm",
+                           labels=list("x" = c("low", "medium", "high"),
+                                       "z" = c("low", "medium", "high")))+ 
+                    labs(x="x", y="y"))
+a
+```
+
+## Tool \#3: Partial Residual Plots
+
+Partial residual plots [@Ezekiel; @larsenMcCleary] are another useful (though rarely used) tool for data analysis. The goal of partial residual plots (PRPs) is to visualize the conditional effect of a variable (i.e., the effect of a predictor variable, after controlling for another predictor or multiple predictors). For simplicity, we will call the variable we wish to control the "covariate" and the variable we wish to determine the effect the "interest variable."
+
+Suppose we have a statistical model of the form $y = b_0 + b_1 X + b_2 Z$. Further suppose we consider $X$ to be our covariate and $Z$ to be our interest variable. We know that the parameter associated with $Z$ ($b_2$) is to be interpreted as the slope of $Z$, *after controlling for the effects of $X$*, or *holding $X$ constant.* How does one visualize this effect?
+
+PRPs are one approach for visualizing the net effect of a variable. PRPs were invented by @Ezekiel, then independently reinvented by @larsenMcCleary. To plot a PRP, we:
+
+1. Fit the entire statistical model (for example, $y = b_0 + b_1 X + b_2 Z$). 
+2. Calculate the residuals from Step #1. We will call these residuals $e_{Y|X + Z}$. 
+3. Calculate the residuals with only the $X$ effect removed (but not the $Z$ effect). We will call these residuals $e_{Y|X \neg Z}$. To calculate these, we add the fitted values for $Z$ back to the residuals: $e_{Y|X \neg Z} = e_{Y|X + Z} + \beta_Z \times Z$. 
+4. Plot the $Z$ variable against these new residuals ($e_{Y|X \neg Z}$). 
+
+Let us carefully consider what these plots are telling us. Recall that residuals tell us the portion of the outcome the model failed to fit. In this case, the residuals tell us what parts of $y$ could not be fit with either $X$ or $Z$. When we then add back in the fit of $X$ (Step 3), the residuals tell us what neither $X$ nor $Z$ were able to fit *plus* the part that $X$ *was* able to fit. Put differently, these new residuals control for the effect of $Z$, but not $X$. When we then plot the raw $X$ values against these new residuals, the resulting plot will yield an accurate representation of the *unique* effect of $X$ on the outcome. Furthermore`, the slope of the plotted line is *exactly* equal to $b_2$.[^avp] As such, these are a precise visual representation of the statistical model. 
+
+[^avp]: An alternative to PRPs is an added variable plot [@kutner2004applied]. The idea behind added variable plots (AVPs) is very similar to PRPs. With AVPs, we fit a model between the covariate (e.g., $Z$) and the outcome (e.g., $Y$), extract the residuals, then plot these residuals against the interest variable (e.g., $X$). AVPs then are a visual approximation of the model where X and Z are predictors of Y. However, because the interest variable isn't actually modeled, it is only an approximation and the slope in the AVP is not identical to the slope from the multivariate model, as they are in the PRP. 
+
+PRPs are enormously helpful for visualizing multivariate relationships simply because they convert a complex multivariate relationship (e.g., the model $y = b_0 + b_1 X + b_2 Z$) into simple bivariate scatterplots. In this case, we could have a PRP for the $X$ effect and one for the $Z$ effect. However, this simplification is *only* merited if the statistical model doesn't contain unmodeled interactions or nonlinear terms. If there are unmodeled multiplicative effects, the simple main effects are biased and misleading. Granted, one could model these multiplicative effects and the statistical estimates will be unbiased. However, multiplicative effects render the "main effects" (or marginal effects) uninterpretable [@Appelbaum1974]; variables with multiplicative effects must be interpreted in the context of the other variable(s) involved in the multiplicative effect. Likewise, a traditional bivariate PRP will be misleading if there are multiplicative effects. This seriously limits the usefulness of traditional PRPs since multiplicative effects are quite common [@Cronbach1975]. Fortunately, the traditional PRP can be slightly modified to accommodate situations where multiplicative effects are present. In the next section, we introduce a multivariate extension of the PRPs that will accomplish this goal. 
+
+### Multivariate Extensions of PRPs
+
+The multivariate extension of the PRP follows the same procedure as the original approach. Now, however, the user can specify more complex statistical models in Step #1 (e.g., $y = b_0 + b_1 X + b_2 Z +b_3 X^2 + b_4 X\times Z$). Also, one can take a flexplot approach and visualize multiple variables simultaneously (e.g., plot $X$ on the $X$-axis, $W$ in panels, and the remaining residuals on the $Y$-axis). Now, however, one would add back in the residuals of multiple variables (e.g., $X$ *and* $W$) in Step #3. 
+
+This can all be done in the Flexplot package in R (as of version 10.0.2.1), using the function `partial_residual_plot`. To do so, the function requires four arguments: 
+
+1. **A Flexplot equation that specifies how variables are to be plotted.** As before, we use an equation of the form `y~a+b|c+d`, or any of its variations (e.g., `y~a|b`, which places $b$ in panels, or `y~a+b`, which plots different lines/colors/symbols for different levels of $b$).
+2. **The multivariate model.** This model may contain any number of predictors, nonlinear terms, and/or interaction components. As of this writing, the `partial_residual_plot` function requires the model to be an `lm` model, though future versions of Flexplot will extend this functionality to additional models (e.g., `glm`, or `rlm` models). 
+3. **Which terms in #2 are going to be added back to the residuals from the model.** Note that the terms added back must involve the same variables used in Step 1 (e.g., if one specifies `y~a|b` in Step 1, the terms added back might be `a + a^2 + b + a:b`, each of which involves the variables `a` and `b`.)
+4. **The dataset**
+ 
+```{r prp1a, echo=FALSE, fig.cap="This plot shows a multivariate partial residual plot of the friend ideation/depression relationship, conditional on stress and health. I = ideation, S = Stress, H = Health.", fig.width=7, fig.height=5, out.width="70%", fig.align="center"}
+model = lm(ideation~stress + 
+             I(stress^2)+ 
+             depression * friend_ideation + 
+             health, 
+           data=ideation)
+partial_residual_plot(ideation~friend_ideation | depression, 
+                      model=model, 
+                      added_term = ~depression*friend_ideation, 
+                      data=ideation,
+                      labels=list("depression" = c("low", "medium", "high"))) +
+  # modify the labels
+  ylab(expression(I==S~+~S^{2}~+~H)) + 
+  xlab("Friend Ideation") +
+  theme_bw()
+``` 
+    
+The code below demonstrates how to do this in R. This code first fits the entire model from Equation \@ref(eq:model) (where ideation is predicted from health, stress, a quadratic stress term, depression, friend ideation, and the interaction between friend ideation and depression). Subsequently, we use the `partial_residual_plot` function to specify the Flexplot equation for graphing (`ideation~friend_ideation|depression`), which will plot friend_ideation on the $X$-axis and depression in panels. We also specify the `added_term` argument, which specifies which terms to add back into the residuals (in this case `~depression*friend_ideation`, which will add back to the residuals the main effects and interactions from depression and friend_ideation). Additional arguments are added for visual clarity (including labeling the axes). The resulting plot is shown in Figure \@ref(fig:prp1a)
+
+```{r prp1, echo=TRUE, eval=FALSE}
+require(flexplot)
+# fit the multivariate model
+model = lm(ideation~stress+I(stress^2)+ 
+             depression*friend_ideation + 
+             health, 
+           data=ideation)
+# plot the PRP
+partial_residual_plot(ideation~friend_ideation | depression, 
+                      model=model, 
+                      added_term = ~depression*friend_ideation, 
+                      data=ideation) +
+  # modify the labels
+  ylab(expression(I==S~+~S^{2}~+~H)) + 
+  xlab("Friend Ideation") +
+  theme_bw()
+```
+
+Now, suppose we wished to visualize the stress effect. The stress effect does not interact with other variables but it does have a nonlinear relationship with the outcome. As before, we might pass the fitted multivariate model to the `partial_residual_plot` function as before, but our Flexplot formula would be `ideation~stress`. We also tell the function to add the terms `~stress + I(stress^2)` back to the residuals of the model so we can visualize the totality of the stress effect. The code below produces the plot in Figure \@ref(fig:prp2):
+  
+```{r prp2, echo = TRUE, fig.cap="This plot shows a multivariate partial residual plot of the stress relationship, conditional on health, depression, and friend ideation. In this PRP, we add back the linear and nonlinear effects of stress. I = ideation, S = Stress, H = Health, D = Depression, FI = Friend Ideation.", fig.width=5, fig.height=3, fig.align="center", out.width="75%"}
+# plot stress on the x-axis, and remove it's linear and nonlinear components
+partial_residual_plot(ideation~stress, 
+                      model=model, 
+                      added_term = ~stress + I(stress^2), 
+                      data=ideation) +
+  # modify the labels
+  ylab(expression(I==H~+~D~+~FI~+~{D}%*%{FI})) + 
+  xlab("Stress") +
+  theme_bw()
+
+```
+
+### Residual Analysis with PRPs
+
+Our multivariate extension of PRPs are useful, not only because they are able to accurately visualize the conditional statistical effects, but they're also useful for identifying *unmodeled* effects. To do so, one could leave the `added_term` argument blank, which will tell the `partial_residual_plot` function to simply plot the residuals (instead of adding back an effect to the residuals). In this situation, these plots are similar (if not identical) to residual dependence plots[^rdps], which are often used to identify missing nonlinear components and/or heteroscedasticity.
+
+[^rdps]: Residual dependence plots show the fitted values on the $X$-axis and the residuals of the model on the $Y$-axis. They are frequently used in model diagnostics to see whether there are unmodeled relationships between the fit of the model and the residuals (e.g., if there's linearity that wasn't modeled). If one produces a bivariate graphic with a PRP without specifying any values in the `added_term` argument, PRPs are exactly equal to the residual dependence plot. However, PRPs can also plot multivariate plots, or (as we said previously) add back fitted elements into the plot. As such, residual dependence plots are a "special case" of PRPs. 
+
+For example, suppose we have a model where we fit the linear component of stress, but not the nonlinear component. In this case, residualizing from the model will have removed the lienar component of stress, but not the nonlinear effect. As such, the residuals will be nonlinearly correlated with the stress effect. If we then plot stress as a PRP without adding any terms back to the model, the raw data will display a nonlinear relationship (which indicates that our model failed to capture the nonlinear effect of stress on the outcome). Figure \@ref(fig:missingnonlin) shows that result. These sorts of residual analysis plots are a critical component of the visualization strategy we will soon recommend.
+
+```{r missingnonlin, fig.cap="This figure shows a PRP of stress against the model that includes the linear, but not the nonlinear terms of stress. In this situation, PRPs are identical to partial residual plots, which highlight sources of unmodeled nonlinearity.", fig.width=5, fig.height=3, fig.align="center", out.width="75%"}
+
+model = lm(ideation~stress + 
+             depression * friend_ideation + 
+             health, 
+           data=ideation)
+partial_residual_plot(ideation~stress, 
+                      model=model,
+                      data=ideation) +
+  ylab(expression(I==H~+~D~+~FI~+~{D}%*%{FI})) + 
+  xlab("Friend Ideation") + 
+  theme_bw()
+
+```
+
+
+# Rules and Assumptions and Visual Partitions
+
+For this paper, we assume the researcher is using linear models. This class of models includes t-tests, ANOVAs, Factorial ANOVAs, ANCOVAs, and multiple regression [@Cohen1968]. With minor modifications, our visual modeling approach can be extended to additional model types, including mixed models and generalized linear models, though currently the `partial_residual_plot` function only accepts linear models. We also assume that for each analysis there is a "true" model, or the model that generated the data. Granted, the researcher never really knows what the true model is. Rather they are attempting to best align their hypothesized model with the true model. 
+
+## When the "True Model" Contains Only Main Effects
+  
+Let's suppose the true model contains only main effects. For example, suppose one is trying to model decision-making from mood and emotional intelligence. Here positive values of mood means that individual is in a generally good mood. 
+
+When trying to visualize the bivariate relationship between mood and decision-making, one might be tempted to produce a simple scatterplot between decision-making and mood, as in the left image in Figure \@ref(fig:mainEffects). This figure suggests a positive relationship between mood and decision-making. However, in the multivariate model (where the model controls for emotional intelligence), the relationship between the two is actually negative (i.e., this model suggests that once we control for one's emotional intelligence, being in a bad mood actually improves decision-making). In other words emotional intelligence is a "suppressor" variable. 
+
+
+```{r mainEffects, fig.cap="This figure shows a simple bivariate relationship between mood and decision-making (left) and a partial residual plot (right). The simple bivariate correlation suggests a simple positive relationship between mood and decision-making, but the multivariate (conditional) relationship shows that, once we control for emotional intelligence, the relationship between mood and decision-making is actually negative."}
+
+set.seed(1212)
+ # mood, emotion, performance
+mat = matrix(c(
+  1, .4, .1,
+  .4, 1, .6, 
+  .1,.6,  1),
+  nrow=3
+)
+
+d = MASS::mvrnorm(904, mu = c(0,0,0), Sigma = mat) %>%
+  data.frame() %>%
+  set_names(c("mood", "emotion", "performance"))
+
+a = flexplot(performance~mood, data=d, method="lm") +
+    labs(x="Mood", y="Decision-Making")
+b = partial_residual_plot(performance~mood, 
+                          lm_formula = performance~mood+emotion, 
+                          data=d,
+                          added_term = ~mood) +
+    labs(x="Mood", y="Decision-Making | Emotional Intelligence")
+a+b
+```
+
+
+When using a multivariate model, a simple bivariate graphic may be misleading because it shows the "total effect" of the bivariate relationship. This total effect ignores the multivariate nature of the data. When these same effects are plotted as PRPs, it subtracts out the effect of the covariate and displays the net effect of the variable of interest. The net effect may be very different from that shown by a simple bivariate plot. For this reason, the first rule of visual partitions is to **plot conditional effects using partial residual plots**. 
+
+However, we need not plot both variables simultaneously (e.g., using a Flexplot where one variable falls on the $X$-axis and the other is panelled). The reason for this is because the effect of the variable of interest (in this case, mood) does not depend on specific values of the other variable (because there are no interactions). Rather, it only depends on the *average* value of the other variable, which is why we can plot the main effects with a simple partial residual plot. 
+
+## When the "True Model" Contains Nonlinear Effects
+
+Now suppose the true model contains one or more nonlinear effects. Returning to the suicide ideation dataset, maybe we are interested in modeling the effects of stress and health on suicide ideation. Recall that there is a nonlinear effect of stress on suicide ideation. If we were to plot a PRP of the linear effect of stress (left image in Figure \@ref(fig:nonlinear)), that visual would be misleading. (In this case, the nonlinear stress effect is very striking, so we would likely notice the problem with our visual). These results highlight the second rule of visual partitions: **when nonlinear effects exist, we must plot both the linear and nonlinear effects of that variable simultaneously.** Beyond that, however, we can plot this variable with a simple bivariate PRP. 
+
+```{r nonlinear, fig.cap="This figure shows PRPs of the stress/suicide ideation relationship (after controlling for health). The left plot shows the relationship between stress and suicide ideation (after controlling for health), while overlaying a regression line. This graphic is misleading since stress has a nonlinear effect. The right plot shows the linear and nonlinear effects."}
+
+mod = lm(ideation~stress + health, data=ideation)
+a = partial_residual_plot(ideation~stress, 
+             data=ideation,
+             added_term = ~stress, 
+             model = mod) +
+  labs(y="Suicide Ideation | Health", x= "Stress (Linear Only)")
+mod = lm(ideation~stress + health + I(stress^2), data=ideation)
+b = partial_residual_plot(ideation~stress, 
+             data=ideation,
+             added_term = ~stress + I(stress^2), 
+             model = mod) + 
+  labs(y="Suicide Ideation | Health", x= "Stress (Linear and Nonlinear Terms)")
+a+b
+```
+
+
+## When the "True Model" Contains Interaction Effects
+
+Now suppose the "true model" contains interaction effects. It is generally known that one should not interpret main effects in the presence of interactions [@Appelbaum1974], since the size (and sometimes the direction) of the main effect differs depending on the level of the variable with which it interacts. Put differently, the interpretation of one variable's effect is "entangled" with the other variable's values. For this reason, all variables involved in the interaction must be visualized together. 
+
+Consider Figure \@ref(fig:interactionPrp), which shows the relationship between depression and ideation (on the left) and ideation with depression/friend ideation (on the right). The left plot would lead us to believe that increases in depression always increase suicide ideation. However, the plot on the right reveals that the relationship is more complex--it depends on the suicide ideation of one's friend. 
+
+```{r interactionPrp, fig.cap="This figure shows PRPs of the depression/ideation main effect (on the left) and the depression/friend ideation interaction (on the right). The figure on the left is misleading as it suggests more depression increases ideation. The right figure clarifies this relationship."}
+
+mod = lm(ideation~depression+friend_ideation, data=ideation)
+a = partial_residual_plot(ideation~depression, 
+             data=ideation,
+             added_term = ~depression, 
+             model = mod) +
+  labs(y="Suicide Ideation | Friend Ideation", x= "Depression")
+mod = lm(ideation~depression*friend_ideation, data=ideation)
+b = partial_residual_plot(ideation~depression|friend_ideation, 
+             data=ideation,
+             added_term = ~depression*friend_ideation, 
+             model = mod) + 
+  labs(y="Suicide Ideation", x= "Depression")
+a+b
+```
+
+This leads us to the third rule of visual partitions: **variables which interact must be visualized together**. This applies to not only two-way interactions, but three-way, four-way, etc. interactions. However, these variables that interact can be interpreted in relative isolation (provided one uses a PRP to condition for the other variables in the model). For example, we need only visualize depression/friend ideation together, but need not visualize depression/friend ideation/stress. 
+   
+## Summary of the Rules for Visual Partitions    
+    
+In summary, for visual partitions to be valid interpretations of the multivariate model, we must obey the following rules:
+
+1. Variables with main effects should be interpreted with PRPs 
+2. For variables containing nonlinear terms, both the linear and nonlinear effects should be visualized together with PRPs
+3. Variables that interact with one another must be visualized together in a PRP
+
+Provided we follow these rules, the end result of a visual partitioning analysis will be a simple graphic that conveys the entirety of the multivariate model without bias. Furthermore, each individual plot can be interpreted in isolation, without fear of missing critical components of the multivariate model. 
+
+For example, suppose our "true model" for the ideation dataset is as follows:
+
+\begin{align}
+\label{eq:model} \text{suicide ideation}=b_0 +& b_1 \text{health} \\
+\nonumber                              +& b_2 \text{stress} + b_3 \text{stress}^2 \\
+\nonumber                              +& b_4 \text{friend ideation} + b_5 \text{depression} + b_6 \text{friend ideation} \times \text{depression} 
+\end{align}
+
+To provide a complete representation of the entire multivariate model requires only three plots: (1) a bivariate PRP of the linear health relationship, (2) a bivariate plot of the linear/nonlinear stress relationship, and (3) a multivariate plot of depression/friend ideation. Each of these plots can be interpreted in isolation without bias. 
+  
+## Visual Partitions and Linear Model Assumptions
+
+Recall that linear models make a few key assumptions: 
+
+1. Normality (meaning that the residuals of the model must be normally distributed)
+2. Homoscedasticity (meaning that the size of the residuals do not drastically fluctuate across the values of the predictors)
+3. Independence.
+4. Additivity. 
+
+This last assumption is not often talked about and is, perhaps, poorly understood. This assumption states that all modeled main effects contain only simple effects. In other words, if there are main effects in the hypothesized model, this assumption states that these variables do not have nonlinear effects, nor do they interact with one another [@gelman2006data]. The reason for this last assumption is clear: if there are nonlinear and/or interactive effects, any interpretation of the main effects is misleading. Likewise, visualizing main effects when they have non-additive effects is misleading. As such, the rules of visual partitions are implied by the assumptions of linear models. 
+
+# Visual Partitions in Confirmatory Versus Exploratory Research
+
+Now that we have introduced the appropriate tools and identified the rules for visual partitions, let us now turn to how they can be practically applied in research settings. Before we do so, it is important to discuss the distinction between confirmatory and exploratory research. This is important because visual partitions play different roles in confirmatory versus exploratory research. 
+
+The rules for conducting confirmatory research are quite strict [@Fife2019a; @Wagenmakers2012]. The reason for this is because confirmatory research relies strongly on the rules of probability. For probability estimates (e.g., p-values and confidence intervals) to have probabilistic meaning, the following conditions must be met:
+
+* The sample size, Type I/II error rates, and exact model must be specified in advance
+* Only one hypothesis test can be performed (or probability estimates must be corrected for multiple comparisons)
+* There can be no deviation from the original model/sample size plan
+* The assumptions of the model must be met
+
+(We might also add that confirmatory research will most likely be preregistered.)
+
+When one is doing strict confirmatory research (which is quite rare), visual partitions are used primarily to *communicate* or present the multivariate model. They are a succinct representations of a complex multivariate model. This representation is far more informative than a simple ANOVA summary table. In other words, the "strategy" for confirmatory research is to simply produce a PRP using the aforementioned three rules. However, these visual partitions might also indirectly play a *diagnostic* role simply because these visuals may highlight nonlinearities a main effects model failed to capture. If this is the case, the analysis is no longer confirmatory and migrates to exploratory (or "rough confirmatory", Fife & Rodgers, 2022). 
+
+Rough confirmatory research occurs when one has specified a hypothesis in advance, but has not prespecified the statistical model. As such, researchers might have the flexibility to audition different measures of the outcome variable and/covariates, model interactions and/or nonlinear effects, perform transformations, etc. This might sound like "p-hacking" [@Simmons2011a]. However, there's a critical (but small) difference between p-hacking and rough confirmatory research: rough confirmatory research is transparent, while p-hacking is not. It has been argued that most research is exploratory [@McArdle2012], or at most rough confirmatory (Fife & Rodgers, 2022). 
+
+With rough confirmatory/exploratory research, the goal shifts from *communicating* multivariate effects to *identifying* multivariate effects, including (and especially) interaction and nonlinear effects.[^viz_phacking] In the following section, we will identify a strategy for using the idea of visual partitions to uncover hidden patterns in data. 
+
+[^viz_phacking]: It is common knowledge that p-values are susceptible to "p-hacking," or multiple testing. It can be argued that searching for striking results in plot after plot is not any different than searching for statistically significant results [@buja2009statistical]. In a sense, this is true. However, the p-value is supposed to indicate the probability of observing the data (or data more extreme) given that the null is true. When doing multiple testing, this p-value no longer means what it's supposed to mean; multiple testing has rendered the p-value meaningless. For visuals, on the other hand, the plot does not rely on probabilities and its interpretation doesn't change when one has done multiple testing. However, there is still the possibility that patterns uncovered through visualizations are spurious. Consequently, one should confirm these patterns on a fresh dataset. 
+
+## Overall Strategy for Visual Partitioning in Exploratory/Rough Confirmatory Research
+
+Research questions (and hypotheses) will specify the appropriate outcome and predictor variable(s). Naturally, one might begin by assuming a simple main-effects model. To identify the viability of a main-effects-only model, one can combine the aforementioned tools into a simple strategy. The goal of this strategy is to visually partition the results of a multivariate analysis and to ensure additivity is met. The strategy consists of five steps:
+
+1. Identify nonlinear effects with loess lines. 
+2. Identify interactions with marginal plots. 
+3. Model (and optionally test) for nonlinear/interactive effects found in Step 2.
+4. Use PRPs to perform residual analysis from the model in Step 3.
+5. Visualize final model partitions using PRPs. 
+
+Each of these steps requires some elaboration, which we do in the next sections. 
+
+### 1. Identify Nonlinear Effects 
+
+This step is, perhaps, the easiest. This step requires the researcher to produce a simple bivariate graphic of each variable against the outcome variable. Flexplot will default to plotting a loess line. If the line has a pattern of nonlinearity for a particular variable, a nonlinear term may need to be added to the model. 
+
+At first glance, this strategy seems prone to bias; are we not ignoring the multivariate nature of the data if we simply plot bivariate scatterplots? For example, a nonlinear effect might appear to exist in a bivariate graphic, but disappears once we've modeled an interaction effect. Or, conversely, the bivariate plot might suggest a variable's effect is linear, but when viewed in the context of other variables, there is a nonlinear effect. 
+
+Each of these scenarios are possible. However, we have several steps that remain that are designed to detect any sort of effects we might miss in the earlier stages. By beginning with simple bivariate plots, it gives us a straightforward starting point. 
+
+### 2. Identify Interaction Effects With Marginal Plots
+
+Once we have identified plausible nonlinear effects, it is time to identify interactions. Recall that Flexplot allows one to visualize multiple variables simultaneously, using symbols/lines/colors and/or panels. The purpose of visualizing these simultaneously is to detect interactions. However, unless the user displays one of the variables doing the interacting on the $X$-axis, and unless the other variable doing the interacting is displayed somewhere else in the Flexplot graphic, they cannot be visually detected. As such, Step #2 is an iterative process. 
+
+For our example data, we would alternate placing friend ideation, health, stress, and depression on the $X$-axis. Recall that depression interacts with friend ideation. To detect this interaction, friend ideation *or* depression must be on the $X$-axis, and the other variable must be displayed as separate lines/colors/symbols or in separate panels. However, marginal plots will only be able to reveal nonparallel lines in the variables represented as row/column panels. So, the following Flexplot equations would detect the interaction:
+
+* `flexplot(ideation~depression | health + friend_ideation, data=ideation)` (slopes would vary as a function of row panels)
+* `flexplot(ideation~friend_ideation + stress | depression + health, data=ideation)` (slopes would vary as a function of column panels)
+* `flexplot(ideation~depression + friend_ideation | health, data=ideation)` (slopes would vary as a function of colors/symbols/lines, though the marginal plots wouldn't help detect these interactions)
+
+On the other hand, the following Flexplot equations would *not* detect interactions:
+
+* `flexplot(ideation~health | depression + friend_ideation, data=ideation)` (neither interacting variable is on the $X$-axis)
+* `flexplot(ideation~depression | stress + health, data=ideation)` (one of the interacting variables [friend ideation] isn't displayed)
+
+Once again, we emphasize this is an iterative process: one must take turns visualizing each variable on the $X$-axis, and one must allow every other variable in the model to be in a panel at one time or another. This may require several plots. 
+
+There is one important caveat. Often, predictor variables are correlated with one another. For this reason, sometimes a variable that doesn't actually interact with the variable on the $X$-axis will reveal nonparallel lines when, in fact, the lines are nonparallel only because that variable is correlated with another variable with which it interacts. In these situations, it is best to identify the variable with the strongest evidence of nonparallel lines, model that, then use PRPs to see if any remaining variables contain interactions.
+
+### 3. Model Nonlinear/Interaction Effects
+
+Step #1 will be helpful in identifying nonlinear effects, while Step #2 will help in identifying interactions. Once they are identified, these effects should be entered into a linear model. 
+
+One of the weaknesses of visualizations is their ambiguity.[Though, of course, ambiguity is also a strength, at least when ambiguity is merited, @Fife2019e]. It is difficult to determine from a simple graphic whether a curvilinear effect is nonlinear *enough* or if slopes are not parallel *enough* to warrant modeling them. This is where non-visual statistics come in. 
+
+We favor a model comparison approach [@rodgers_epistemology_2010]. With this approach, one specifies a "full model," which contains the multiplicative effect (e.g., a quadratic term) and a "reduced model" (e.g., a model with main effects only). Once specified, these two models can be compared (e.g., using the `anova` function in R, or the `model.comparison` function in `flexplot`). The `model.comparison` function will report AIC, BIC, Bayes factors, $p$-values, and $R^2$. These statistics can assist users in deciding whether the multiplicative effects are worth keeping. 
+
+Ideally, by the end of this step, the user has a good idea of what model is most appropriate. The next step will assist in ensuring no important effects have been missed. 
+
+### 4. Visualize Residuals Using PRPs
+
+Recall that PRPs are a visual representation of the effect of the variable(s) of interest on the outcome, after controlling for one or more covariates. Another way to think about controlling (or conditioning) is "subtraction." When we condition on one or more effects, we are *subtracting* out the effects of those variables. Presumably, when we subtract a variable's effect from the outcome, that same variable should no longer be associated with that outcome. We *should* see a flat relationship between the variable and the residuals if all effects have been modeled. If, on the other hand, that variable has a multiplicative effect and we have only modeled the additive effect, we should still see a relationship between the variable of interest and the residuals of the model. This is exactly what happened in Figure \@ref(fig:missingnonlin). 
+
+We can use this fact to determine whether the effects we've modeled are unbiased. After the nonlinear/quadratic effects are identified (from Steps 1/2) and modeled (from Step 3), we then use PRPs in much the same we way used marginal plots in Step 2; we sequentially plot the residuals against each variable on the $X$-axis  (and the remaining variables in panels or as colors/lines/symbols) and look for flat slopes. If they're all flat and nonlinear, we have captured all signal in the model. If not, there may be missing two-way or three-way interactions, or additional nonlinear terms.
+
+As an example, consider Figure \@ref(fig:threeway). In this example, we have simulated the data to contain both a two-way and a three-way interaction, but have only modeled the two-way interaction. The red lines are the model-implied fitted lines, while the blue lines are regression lines. (We can add regression lines to any PRP by adding the `method="lm"` argument). The partial residual plot reveals that we *still* have nonparallel slopes, even after we've subtracted out the main effects and the two-way interaction, at least in some regions of the Flexplot graphic. These results suggest there's an unmodeled three-way interaction. 
+
+```{r threeway, fig.cap="This plot shows a PRP where the user has modeled a two-way interaction, but there's an unmodeled three-way interaction present. Here, the red lines show the model-implied fit, while the blue lines show regression lines. The blue lines suggest there's still some signal remaining that hasn't been modeled.", fig.width=6, fig.height=4.5, out.width="70%", fig.align="center"}
+cormat = matrix(.3, nrow=4, ncol=4)
+diag(cormat) = 1
+require(tidyverse)
+d = MASS::mvrnorm(1000, c(0,0,0,0), cormat) %>% data.frame %>% set_names(c("y", "a", "b", "c"))
+d$y = with(d, .2*a*b + .5*a*b*c + y)
+mod = lm(y~a + b + c + a:b, data=d)
+p = partial_residual_plot(y~c | b + a, 
+                          data=d, model=mod,
+                          method="lm", suppress_model = F, 
+                          labels = list("b" = c("low", "mid", "high"), 
+                                        "a" = c("low", "mid", "high")))
+p
+```
+
+### 5. Visualize the Final Model Using PRPs
+
+While we have written the previous sections sequentially, in actuality, this is an iterative process. However, once all PRPs show flat lines across all variables, it is time to visualize the final model using conditionally independent partitions. To do so, we follow the same rules for confirmatory visual partitions (visualize main effects with PRPs, visualize nonlinear effects with their linear effects, and visualize interacting variables together). 
+
+Of course, for each of these PRPs, the final model will be inputted into the `partial_residual_plot` function. Also, the `added_term` argument should contain every term in the linear model associated with the variable(s) of interest. For example, any variables with only main effects would simply have the main effect as the `added_term` argument (e.g., `~health`). For nonlinear terms, we would add both the linear and nonlinear terms to the `added_term` argument (e.g., `~stress + I(stress^2)`). For interaction effects, we add both the variable of interest as well as all other variables that it interacts with (e.g., `~ depression + friend_ideation + depression:friend_ideation`). For our suicide ideation dataset, our Flexplot code might look like this:
+
+
+```{r, eval=FALSE, echo=TRUE}
+# fit the final model
+final_model = lm(ideation~health + #main effect of health
+    stress + I(stress^2) + # nonlinear effect of stress
+    depression * friend_ideation, # interaction effect
+    data=ideation)
+
+# plot the health effect
+partial_residual_plot(ideation~health, 
+              model=model, 
+              added_term = ~health, 
+              data=ideation)
+
+# plot the nonlinear stress effect
+partial_residual_plot(ideation~stress, 
+              model=model, 
+              added_term = ~stress + I(stress^2), 
+              data=ideation) 
+
+# plot the interaction effect
+partial_residual_plot(ideation~friend_ideation | depression, 
+                      model=model, 
+                      added_term = ~depression*friend_ideation, 
+                      data=ideation) 
+```
+
+The above code would produce the visual partitions we see in Figure \@ref(fig:allplotstogether). 
+
+```{r allplotstogether, fig.cap="The entire multivariate model in Equation 1 can be visualized using only three PRPs. The top-left plot shows the health effect, the top-right plot shows the stress nonlinear effect, and the bottom plot shows the depression/friend ideation interaction.", fig.align="center", fig.width=6, fig.height=6, out.width="75%"}
+
+model = lm(ideation~stress + 
+             I(stress^2)+ 
+             depression * friend_ideation + 
+             health, 
+           data=ideation)
+a = partial_residual_plot(ideation~health, 
+                      model=model, 
+                      added_term = ~health, 
+                      data=ideation) +
+  ylab(expression(I==S~+~S^{2}~+~D~+~FI~+~{D}%*%{FI})) + 
+  xlab("Health") + 
+  theme_bw()
+b = partial_residual_plot(ideation~stress, 
+                      model=model, 
+                      added_term = ~stress + I(stress^2), 
+                      data=ideation) +
+  ylab(expression(I==S~+~S^{2}~+~H)) + 
+  xlab("Stress") + 
+  theme_bw()
+c = partial_residual_plot(ideation~friend_ideation | depression, 
+                      model=model, 
+                      added_term = ~depression*friend_ideation, 
+                      data=ideation, labels=list("depression" = c("low", "mid", "high"))) +
+  ylab(expression(I==S~+~S^{2}~+~H)) + 
+  xlab("Friend Ideation") + 
+  theme_bw()
+(a + b) / c 
+
+```
+
+# Example Analyses
+
+For our applied analysis, we're going to base our analysis loosely on a study done by @yang2019relationships. Their paper sought to determine the relationship between depression (measured by CESD), Internet addiction (measured by the Internet Addiction Test, or IAT), and health (measured by Health Promoting Lifestyle Profile, or HPLP). More specifically, we will investigate the influence of health and Internet addiction on depression, after controlling for age, BMI, smoking status, alcohol drinking status, and religion. 
+
+A naive analysis of these data might look like Table \@ref(tab:anovatab2). This analysis suggests Internet addiction, health, and drinking have statistically significant effects. However, as we shall see, this conclusion may be premature and misleading. 
+
+```{r anovatab2}
+require(flexplot)
+require(tidyverse)
+require(patchwork)
+d = read.csv("../data/health_depression.csv")
+d = d %>% dplyr::select(Age, BMI, Smoking, Drinking, Religion, CESD, IATTotalscores, HPLPTotalscores) %>% 
+  set_names("Age", "BMI", "Smoking", "Drinking", "Religion", "CESD", "Internet", "Health") 
+
+mod = lm(CESD~Health + Internet + Age + BMI + Drinking + Smoking + Religion, data=d)
+aovtab = data.frame(anova(mod))
+aovtab$F.value = round(aovtab$F.value, digits=2)
+aovtab$F.value[8] = ""
+aovtab$Pr..F. = scales::pvalue(aovtab$Pr..F.)
+papaja::apa_table(aovtab, 
+  caption = "Naive Analysis of the Relationship Between Health/Internet and CESD, After Controlling for Age, BMI, Drinking, Smoking, and Religion", 
+  digits=2, row.names=T, 
+  align = c("l", rep("c", times=ncol(aovtab))),
+  col.names = c("", "DF", "SS", "MS", "F", "p"))
+```
+
+For the analyses that follow, we transformed CESD and health using a square root transformation. This not only rendered the residuals of the model more normally distributed, but it also addressed some initial problems with heteroscedasticity. 
+
+## 1. Visualize Multiple Predictor Variables Simultaneously
+
+As mentioned previously, this step requires us to plot each predictor variable (in our case, age, BMI, smoking status, alcohol, religion, HPLP, and Internet addiction) on the $X$-axis in order to investigate nonlinear effects. Clearly we cannot reproduce all the plots we generated for our analysis. Rather, we will provide a sample of some of the most instructive plots. 
+
+Initially, none of the bivariate plots showed nonlinear effects. However, we discovered in the next step there was a nonlinear *and* interactive effect between Internet/CESD, and either religion or health. Figure \@ref(fig:applied1) shows a plot of the relationship between Internet addiction and CESD, for health and religion. The initial plots with loess lines (not shown) indicated a curvilinear effect. For that reason, Figure \@ref(fig:applied1) plots quadratic regression lines. It also seems the effect of Internet on depression may depend on one or more of these variables (i.e., there may be an interaction present). We will investigate this further in the next section. 
+
+```{r applied1, fig.cap="Flexplot visual of the relationship between Internet addiction and CESD, for various ages and levels of religion. The plots indicate some nonlinearity and possible interaction effects.", fig.width=5, fig.height=5, out.width="75%", fig.align="center"}
+d2 = d %>% 
+  mutate(CESD = sqrt(CESD), Health = sqrt(Health))
+a = flexplot(CESD~Internet|Religion + Health, data=d2, method="quadratic")
+a
+```
+
+## 2. Identify Interaction Effects With Marginal Plots
+
+Figure \@ref(fig:applied2) plots the same image in Figure \@ref(fig:applied1), but with marginal plots. These images suggest the Internet effect is generally positive for each of the levels of health. Across religion, there may be evidence of a small interaction effect; the relationship is concave upward for those who are religious, while it's concave downward for those who are not religious. 
+
+```{r applied2, fig.cap="Marginal plot of the relationship between Internet addiction and CESD, for various ages and religion levels. The row marginal plots indicate Internet may interact with religion.", fig.align="center", fig.width=6, fig.height=6, out.width="75%", }
+marginal_plot(a)
+```
+
+Of course it is difficult to tell conclusively from this graph whether that interaction is worth keeping. To aid in this, we will utilize model comparisons. 
+
+## 3. Model Nonlinear/Interaction Effects
+
+Our original model included only main effects of all the variables. These plots suggest we might include nonlinear terms associated with Internet, as well as an interaction with the religion variable.[^compinteraction] To test this, we will utilize model comparisons [@rodgers_epistemology_2010]. Specifically, we compared the following full and reduced models, 
+
+[^compinteraction]: The images suggest the interaction manifests itself as a change in the coefficient for the *nonlinear* term (i.e., the quadratic component). For this reason, we need to model both the interaction term between Internet and religion, as well as the interaction between the quadratic term and religion. 
+
+\begin{align}
+\nonumber Full\,Model: \text{CESD}    &= Health + Internet + Age + BMI + Drinking + Smoking + Religion + \\
+\nonumber & \qquad \qquad Internet \times Religion + Internet^2 + Internet^2 \times Religion \\
+\nonumber Reduced\,Model: \text{CESD} &= Health + Internet + Age + BMI + Drinking + Smoking + Religion
+\end{align}
+
+We used `flexplot` to compute the AIC, BIC, the Bayes factor (derived from the BIC), the $p$-value from a likelihood ratio test[whyp], and the model's $R^2$. These results are presented in Table \@ref(tab:modelcomp). Unfortunately, the results are a little ambiguous; the AIC and $p$-value both favor the full model, while the BIC (and the BF) favor the reduced model. Recall that the BIC is more conservative than the AIC, so the fact that there's disagreement isn't surprising, especially since the full model estimates three additional parameters. Also, the full model explains an additional 2% of the variance, beyond the reduced model. For the sake of our example, we will accept the full model before moving on to the next section. 
+
+[^whyp]: It may seem odd to report p-values for our example analysis when we earlier suggested that p-values have no probabilistic meaning when doing rough confirmatory research. We decided not to omit them for a few reasons. First, we're studying p-values in the context of various other model comparison metrics (AIC, BIC, Bayes Factors, and $R^2$); in other words, p-values are not the *only* metric we're using to decide whether two models are different. Also, @Behrens1997 noted that, when in rough confirmatory mode, researchers may utilize "loosely interpreted significance tests" (p. 133). This is what we're doing here; we're not lending the p-values any probabilistic interpretation. Instead, we're using it as a crude measure of a the difference between two models.
+
+
+```{r modelcomp}
+Full = lm(CESD~Age + BMI + Smoking + Drinking + Health + 
+     Internet + Religion + Internet:Religion +
+     I(Internet^2) + I(Internet^2):Religion, data=d)
+Reduced = update(Full, .~.-(Internet:Religion + I(Internet^2) + I(Internet^2):Religion))
+results = model.comparison(Full, Reduced)$statistics
+papaja::apa_table(results, 
+                  caption = "Model Comparison of the Full and Reduced Model for the Depression, Internet Addiction, and Health Dataset.",
+                  digits=2, row.names=T,
+                  align = c("l", rep("c", times = ncol(results))),
+                  col.names = c("", "AIC", "BIC", "BF", "p", "$R^2$"))
+```
+
+## 4. Visualize Residuals Using PRPs
+
+Having (provisionally) chosen our full model, we will now utilize PRPs to identify whether there are any remaining effects the model has missed. As before, we will only show one representative plot to save space. Figure \@ref(fig:prpexample) shows a PRP with Internet on the $X$-axis, and health/religion in panels. The residuals of the full model are shown on the $Y$-axis. As such, we would expect to see flat lines throughout the plots if we have adequately modeled all effects. We have overlaid loess lines (blue), as well as the model-implied fit (red lines). For the most part, the two lines generate quite similar results, suggesting our model (Full Model) has extracted any signal existing between Internet, health, and religion. 
+
+```{r prpexample, fig.cap="Partial residual plot between the residuals of CESD for the full model and Internet, health, and religion. Red lines are the model-implied fit and blue lines are loess lines.", fig.align="center", fig.width=8, fig.height=5, out.width="75%"}
+library(extrafont)
+loadfonts()
+theme_update(text = element_text(family = "Times"))
+partial_residual_plot(CESD~Internet | Health + Religion, data=d, model=Full, method="loess") +
+  labs(x="Internet", y = "CESD Residuals (Full Model)") 
+```
+
+## 5. Visualize the Final Model Using PRPs
+
+Recall that our full model has main effects for all our predictors, as well as a nonlinear effect for Internet and an interaction between the Internet effect and religion. For that reason, our final visualizations should include: 
+
+* bivariate plots for BMI, drinking, smoking, age, and health
+* a multivariate plot for Internet and religion
+
+To save space, we chose not to plot all bivariate plots. Instead, we just plot health, Internet, and religion (since the other variables were covariates and not of theoretical interest). Figure \@ref(fig:prpfinalexample) visualizes the marginal effect of health on CESD (top plot) and the marginal effect of Internet/religion (bottom plot). These results suggest there's a very small conditional effect of health on depression. Also, Internet addiction generally increases depression, but the rate of increase is not consistent. For religious individuals, the effect of Internet on CESD is nonlinear: initially small changes in Internet addiction leads to relatively small increases in depression, but later changes result in increasingly larger changes in depression. For those who are not religious, on the other hand, the effect of Internet addiction on CESD tapers off; while initially small changes in Internet addiction yields large changes in depression, once these individuals reach a score of around 60, increasing Internet addiction has little effect on depression. Granted, we may be interpreting noise. (The model comparison statistics were a little ambiguous). However, these results could serve as an important starting point for subsequent studies. 
+
+```{r prpfinalexample, fig.cap="Final partial residual plots of the internet addiction model. The left plot shows the main effect of health on CESD (after controlling for BMI, age, drinking, smoking, Internet, and religion). The right plot shows the effects of Internet/rligion on CESD (after controlling for BMI, age, drinking, smoking, and health). For the labels, A = age, D = drinking, S = smoking, H = health, I = Internet, and r = religion.", fig.width=8, fig.height=5, scale="65%", fig.align="center"}
+a1 = partial_residual_plot(CESD~Health, 
+                          data=d, 
+                          model=Full, 
+                          added_term = ~Health) +
+  theme(legend.position="none") + 
+  labs(x="Health", y = "CESD | BMI, A, D, S, I, and R", subtitle = "Marginal Effect of Health")
+a2 = partial_residual_plot(CESD~Internet | Religion, 
+                          data=d, 
+                          model=Full, 
+                          added_term = ~Internet + Religion + Internet:Religion +
+                                              I(Internet^2) + I(Internet^2):Religion) +
+  theme(legend.position="none") + 
+  labs(y = "CESD | BMI, A, D, S, and H", subtitle = "Marginal Effect of Internet/Religion")
+
+  a1 + a2 + patchwork::plot_layout(widths = c(1,2))
+```
+
+
+```{r finalmodests}
+#vars_of_interest = c("Age", "BMI", "Smoking", "Drinking", "Health""Internet", ""
+newtab = cbind(summary(Full)$coefficients[, 1:2], standardized.beta(Full)) %>%
+  data.frame %>%
+  mutate(Variable = names(standardized.beta(Full)), 
+         Effect = names(standardized.beta(Full)), 
+         Semip = c(NA, estimates(Full)$semi.p)) %>%
+  select(Variable, Effect, Estimate, Std..Error, V3, Semip) %>%
+  set_names(c("Variable(s)", "Effect", "Estimate", "SE", "Beta", "Semi-Partial"))
+newtab$Effect[1:6] = ""
+prep = round(newtab$`Semi-Partial`[6], digits=4)*100
+newtab$`Semi-Partial` = round(newtab$`Semi-Partial`, digits=4)
+newtab$`Semi-Partial`[7] = -1*diff(results$rsq)
+newtab$`Semi-Partial`[c(1,8:11)] = ""
+newtab$`Variable(s)`[7] = c("Internet/Religion")
+newtab$`Variable(s)`[8:11] = ""
+newtab$`Effect`[9] = "$\\text{Internet}^2$"
+newtab$`Effect`[10] = "Internet $\\times$ Religion"
+newtab$`Effect`[11] = "$\\text{Internet}^2 \\times$ Religion"
+options(knitr.kable.NA = '')
+papaja::apa_table(newtab, 
+                  caption = "ANOVA Summary Table/Effect Sizes for the Final Model.",
+                  row.names=F,
+                  escape = F,
+                  digits=c(0,0,2,2,2,0),
+                  align = c("l", "l", rep("c", times = ncol(newtab)-1)))
+?apa_table
+# combined_effects = data.frame(anova(Reduced, Full))
+# semip = summary(Full)$r.squared - summary(Reduced)$r.squared
+# a = with(combined_effects, c(Df[2], Sum.of.Sq[2], Sum.of.Sq[2]/Df[2], F[2], Pr..F.[2], semip))
+# final_results[6,] = a
+# row.names(final_results) = c(row.names(anova(Full))[1:5],"Internet/Religion")
+# final_results = final_results %>% 
+#   mutate(semi.partial = round(semi.partial,digits=3), 
+#          p = scales::pvalue(p), 
+#          DF = round(DF),
+#          SS = round(SS, 1),
+#          MS = round(MS, 1),
+#          F = round(F, 1))
+
+
+```
+
+For the sake of completeness, we also present the statistical estimates associated with the final model (see Table \@ref(tab:finalmodests)). Notice we have lumped together the Internet/religion effects (including the nonlinear components). We have done this because these effects should not be interpreted in isolation [@Appelbaum1974]; an interaction effect renders main effects uninterpretable (because the effect *depends* on other effects). Together, the two explain about `r prep`% of the variance. 
+
+## Summary
+
+The naive results presented in Table \@ref(tab:anovatab) were both routine in applied research and potentially misleading. That model suggested health, Internet addiction, and drinking have significant effects on depression. However, a deeper investigation identified potential multiplicative effects that threaten the validity of our conclusions. There is evidence to suggest the effect of Internet addiction on depression is nonlinear, and it interacts with religion in surprising and interesting ways. Our final model may be less biased, more theoretically interesting, and easier to conceptualize. 
+
+# Discussion
+
+The traditional way of reporting multivariate models rely heavily on ANOVA summary tables. These tables do not indicate the nature of effects (e.g., size/direction of main effects, how variables interact). Furthermore, these tables rely on p-values, which have no probabilistic meaning in all but the most stringent of conditions. 
+
+A better approach is to utilize what we call "visual partitions." Visual partitions dissect multivariate models into relatively independent visuals that can be interpreted in isolation without bias. For confirmatory research, visual partitions clearly communicate the entirety of the multivariate model. With exploratory research, a visual partitions approach (along with marginal plots and PRPs) can be used to identify hidden nonlinear effects (including interactions). 
+
+Perhaps the greatest advantage of the visual partitions approach is that it allows one to *simplify* complex multivariate models; one's multivariate model can be condensed, without bias, into a handful (or less) of easy-to-understand graphics which we call "visual partitions." This simplification is becoming increasingly important in the current research landscape; there's a growing mistrust of scientific results among both scientists [@Baker2016a] and laypersons [@mistrustpublic]. Visuals provide a convenient and effective solution to increasing transparency and trust of scientific results [@Tay2016a]. In other words, visual partitions offer a convenient *communication* medium that simplifies interpretation. This paper has provided tools (marginal plots, multivariate partial residual plots), strategies, and software examples. With these resources, we hope researchers will better be able to identify important effects in their models that might otherwise have been missed. 
+
+\pagebreak
+
+# Getting Started with Flexplot
+
+As of this writing, Flexplot is available through Github only. It can be in stalled by first installing the devtools package:
+
+```{r, echo=TRUE, eval=F}
+install.packages("devtools")
+```
+
+With `devtools` installed, Flexplot can now be installed from Github, then loaded into the R environment:
+
+```{r, echo=TRUE, eval=F}
+devtools::install_github("dustinfife/flexplot")
+require(flexplot)
+```
+
+The `flexplot` package comes pre-loaded with the suicide ideation dataset used throughout this paper. The name of the dataset is `ideation`. 
+
+
+To visualize a multivariate plot, we might use the `flexplot` command as follows:
+
+```{r, echo=TRUE, eval=F}
+p = flexplot(ideation~depression | friend_ideation + stress, data=ideation)
+```
+
+Notice I'm assigning the plot to an object called `p`. This makes it easier to then use marginal plots:
+
+```{r, echo=TRUE, eval=F}
+marginal_plot(p)
+```
+
+To use partial residual plots, we have to first fit a model:
+
+```{r, echo=TRUE, eval=F}
+full_model = lm(ideation~health + 
+                  stress + I(stress^2) +
+                  friend_ideation*depression, 
+                data=ideation)
+```
+
+(Note: `friend_ideation*depression` is a shortcut for `friend_ideation + depression + friend_ideation:depression`). 
+
+Now we can use PRPs to visualize any of the model's relationships:
+
+```{r, echo=TRUE, eval=F}
+# visualize the health effect
+partial_residual_plot(ideation~health, 
+                           model=full_model,
+                           data=ideation, 
+                           added_term = ~health)
+# visualize the stress linear and nonlinear effects
+partial_residual_plot(ideation~stress, 
+                           model=full_model,
+                           data=ideation, 
+                           added_term = ~stress + I(stress^2))
+# visualize the whole model without adding terms back in
+# (this is like a residual dependence plot)
+partial_residual_plot(ideation~stress + health | 
+                        depression + friend_ideation, 
+                           model=full_model,
+                           data=ideation, 
+                           method="loess")
+    # add a loess line to the plot to compare implied fit (red) 
+    # with optimal fit
+```
+
+
+\pagebreak
+# References

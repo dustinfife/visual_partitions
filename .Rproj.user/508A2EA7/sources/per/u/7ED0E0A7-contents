@@ -1,0 +1,45 @@
+require(flexplot)
+head(ideation)
+set.seed(2323)
+ # mood, emotion, performance
+mat = matrix(c(
+  1, .5, .2,
+  .5, 1, .7, 
+  .2,.7,  1),
+  nrow=3
+)
+
+require(tidyverse)
+d = MASS::mvrnorm(904, mu = c(0,0,0), Sigma = mat) %>%
+  data.frame() %>%
+  set_names(c("mood", "emotion", "performance"))
+summary(lm(performance~mood + emotion, data=d))
+
+
+a = flexplot(performance~mood, data=d, method="lm")
+b = partial_residual_plot(performance~mood, 
+                          lm_formula = performance~mood+emotion, 
+                          data=d,
+                          added_term = ~mood)
+a+b
+
+
+mod = lm(ideation~stress + health + I(stress^2), data=ideation)
+a = partial_residual_plot(ideation~stress, 
+                          lm_formula = ideation~stress + health + I(stress^2),
+                          data=ideation,
+                          added.term = ~stress, 
+                          model = mod) +
+  labs(y="Suicide Ideation | Health", x= "Stress (Linear Only)")
+b = partial_residual_plot(ideation~stress, 
+                          lm_formula = ideation~stress + health + I(stress^2),
+                          data=ideation,
+                          added.term = ~stress + I(stress^2), 
+                          model = mod) + 
+  labs(y="Suicide Ideation | Health", x= "Stress (Linear and Nonlinear Terms)")
+
+a+b
+
+
+
+

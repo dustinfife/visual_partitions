@@ -1,0 +1,5 @@
+"0","flexplot(ideation~stress + health | friend_ideation + depression, data=ideation,"
+"0","         labels=list(""friend_ideation"" = c(""low"", ""medium"", ""high""),"
+"0","                     ""health_binned"" = c(""low"", ""medium"", ""high""),"
+"0","                     ""depression"" = c(""low"", ""medium"", ""high""))) + "
+"0","  labs(y=""Suicide Ideation"", x=""Stress"", color=""Health"", linetype=""Health"", shape=""Health"") + theme_bw()"

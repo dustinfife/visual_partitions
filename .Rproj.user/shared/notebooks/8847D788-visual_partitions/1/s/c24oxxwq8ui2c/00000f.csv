@@ -1,0 +1,5 @@
+"0","marginal_plot("
+"0","  flexplot(y2~x | z + w, data=d, method=""lm"", "
+"0","           labels = list(""x"" = c(""low"", ""medium"", ""high""),"
+"0","                ""z"" = c(""low"", ""medium"", ""high"")))"
+"0","           + theme_bw() + labs(x=""x"", y=""y"", title=""Interaction Between X and W""))"

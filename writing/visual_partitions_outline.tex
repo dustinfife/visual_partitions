@@ -1,0 +1,292 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+  english,
+  doc,floatsintext]{apa6}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{ifxetex,ifluatex}
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={Visual Partitioning for Multivariate Models: An Approach for Identifying and Visualizing Complex Multivariate Datasets},
+  pdfauthor={Dustin A. Fife1 \& Jorge L. Mendoza2},
+  pdflang={en-EN},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+% Make \paragraph and \subparagraph free-standing
+\ifx\paragraph\undefined\else
+  \let\oldparagraph\paragraph
+  \renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+  \let\oldsubparagraph\subparagraph
+  \renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+% Manuscript styling
+\usepackage{upgreek}
+\captionsetup{font=singlespacing,justification=justified}
+
+% Table formatting
+\usepackage{longtable}
+\usepackage{lscape}
+% \usepackage[counterclockwise]{rotating}   % Landscape page setup for large tables
+\usepackage{multirow}		% Table styling
+\usepackage{tabularx}		% Control Column width
+\usepackage[flushleft]{threeparttable}	% Allows for three part tables with a specified notes section
+\usepackage{threeparttablex}            % Lets threeparttable work with longtable
+
+% Create new environments so endfloat can handle them
+% \newenvironment{ltable}
+%   {\begin{landscape}\begin{center}\begin{threeparttable}}
+%   {\end{threeparttable}\end{center}\end{landscape}}
+\newenvironment{lltable}{\begin{landscape}\begin{center}\begin{ThreePartTable}}{\end{ThreePartTable}\end{center}\end{landscape}}
+
+% Enables adjusting longtable caption width to table width
+% Solution found at http://golatex.de/longtable-mit-caption-so-breit-wie-die-tabelle-t15767.html
+\makeatletter
+\newcommand\LastLTentrywidth{1em}
+\newlength\longtablewidth
+\setlength{\longtablewidth}{1in}
+\newcommand{\getlongtablewidth}{\begingroup \ifcsname LT@\roman{LT@tables}\endcsname \global\longtablewidth=0pt \renewcommand{\LT@entry}[2]{\global\advance\longtablewidth by ##2\relax\gdef\LastLTentrywidth{##2}}\@nameuse{LT@\roman{LT@tables}} \fi \endgroup}
+
+% \setlength{\parindent}{0.5in}
+% \setlength{\parskip}{0pt plus 0pt minus 0pt}
+
+% \usepackage{etoolbox}
+\makeatletter
+\patchcmd{\HyOrg@maketitle}
+  {\section{\normalfont\normalsize\abstractname}}
+  {\section*{\normalfont\normalsize\abstractname}}
+  {}{\typeout{Failed to patch abstract.}}
+\patchcmd{\HyOrg@maketitle}
+  {\section{\protect\normalfont{\@title}}}
+  {\section*{\protect\normalfont{\@title}}}
+  {}{\typeout{Failed to patch title.}}
+\makeatother
+\shorttitle{Visual Partitioning}
+\usepackage{csquotes}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows, positioning}
+\usepackage[LGRgreek]{mathastext}
+\ifxetex
+  % Load polyglossia as late as possible: uses bidi with RTL langages (e.g. Hebrew, Arabic)
+  \usepackage{polyglossia}
+  \setmainlanguage[]{english}
+\else
+  \usepackage[main=english]{babel}
+% get rid of language-specific shorthands (see #6817):
+\let\LanguageShortHands\languageshorthands
+\def\languageshorthands#1{}
+\fi
+\ifluatex
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\title{Visual Partitioning for Multivariate Models: An Approach for Identifying and Visualizing Complex Multivariate Datasets}
+\author{Dustin A. Fife\textsuperscript{1} \& Jorge L. Mendoza\textsuperscript{2}}
+\date{}
+
+
+\affiliation{\vspace{0.5cm}\textsuperscript{1} Rowan University\\\textsuperscript{2} University of Oklahoma}
+
+\abstract{
+Users of statistics quite frequently use multivariate models to make conditional inferences (e.g., stress affects depression, after controlling for gender). These inferences are often done without adequately considering (or understanding) the assumptions one makes when claiming these inferences. Of particular concern is when there are unmodeled nonlinear and/or interaction effects. With such unmodeled multiplicative effects, inferences based on a main effects model are not merited. On the other hand, when these effects are properly modeled, complex multivariate analyses can be ``partitioned'' into distinct components to ease interpretation. In this paper, we highlight when conditional inferences are contaminated by other features of the model and identify the conditions under which effects can be partitioned. We also reveal a strategy for partitioning multivariate effects into uncontaminated blocks using visualizations. This approach simplifies multivariate analyses immensely, without oversimplifying the analysis.
+}
+
+
+
+\begin{document}
+\maketitle
+
+\hypertarget{introduction}{%
+\section{Introduction}\label{introduction}}
+
+\begin{itemize}
+\tightlist
+\item
+  Suppose we were to peruse journal and find the results shown in Table \ref{tab:anovatab}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    How are we to make sense of this?
+  \item
+    Does health increase ideation or decrease it?
+  \item
+    What is the nature of the interaction?
+  \end{itemize}
+\end{itemize}
+
+\begin{table}[tbp]
+
+\begin{center}
+\begin{threeparttable}
+
+\caption{\label{tab:anovatab}ANOVA Summary Table of the Suicide Ideation Analysis}
+
+\begin{tabular}{lccccc}
+\toprule
+ & DF & SS & MS & F & p\\
+\midrule
+stress & 1 & 1,598.37 & 1,598.37 & 874.68 & <0.001\\
+$\text{stress}^2$ & 1 & 8,374.25 & 8,374.25 & 4582.65 & <0.001\\
+health & 1 & 2,097.66 & 2,097.66 & 1147.9 & <0.001\\
+friend ideation & 1 & 699.67 & 699.67 & 382.88 & <0.001\\
+depression & 1 & 5,797.63 & 5,797.63 & 3172.64 & <0.001\\
+friend ideation $ \times $ depression & 1 & 2,954.06 & 2,954.06 & 1616.55 & <0.001\\
+Residuals & 2993 & 5,469.36 & 1.83 &  & \\
+\bottomrule
+\end{tabular}
+
+\end{threeparttable}
+\end{center}
+
+\end{table}
+
+\begin{itemize}
+\tightlist
+\item
+  ANOVA summary tables are painfully uninformative
+\item
+  Even if we knew direction/nature, there's still the multivariate nature to contend with
+
+  \begin{itemize}
+  \tightlist
+  \item
+    What can be interpreted in isolation?
+  \item
+    What must be interpreted multivariately?
+  \end{itemize}
+\item
+  This paper introduces ``visual partitions''
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Supplement to ANOVA summary tables
+  \item
+    Visuals that sucinctly communicate the nature of a multivariate analysis
+  \item
+    These partitions can be interpreted in relative isolation without worrying about misinterpreting multivariate model
+  \end{itemize}
+\end{itemize}
+
+\hypertarget{tools}{%
+\section{Tools}\label{tools}}
+
+\begin{itemize}
+\tightlist
+\item
+  Flexplot
+\item
+  Partial Residual Plots/AVPs
+\item
+  Marginal Plots
+\end{itemize}
+
+\hypertarget{assumptions-and-visual-partitions}{%
+\section{Assumptions and Visual Partitions}\label{assumptions-and-visual-partitions}}
+
+\begin{itemize}
+\tightlist
+\item
+  Assume for each analysis there is a ``true'' model
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Researcher may or may not have discovered the true model
+  \item
+    May instead have a ``hypothesized model''
+  \end{itemize}
+\item
+  Suppose ``true model'' only contains main effects
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Simple bivariate plots may be misleading (e.g., suppressor effects)
+  \item
+    Rather, an AVP or a PRP would be appropriate
+  \item
+    But, then marginal effects can be visualized in isolation
+  \end{itemize}
+\item
+  Suppose ``true model'' contains both main effects and nonlinear effects
+
+  \begin{itemize}
+  \tightlist
+  \item
+    Linear plots will be misleading
+  \item
+    AVPs (or PRPs) must include the nonlinear component
+  \end{itemize}
+\end{itemize}
+
+\hypertarget{visual-partitions-in-confirmatory-research}{%
+\section{Visual Partitions in Confirmatory Research}\label{visual-partitions-in-confirmatory-research}}
+
+\hypertarget{visual-partitions-in-exploratory-research}{%
+\section{Visual Partitions in Exploratory Research}\label{visual-partitions-in-exploratory-research}}
+
+\hypertarget{xx-step-strategy}{%
+\subsection{XX Step Strategy}\label{xx-step-strategy}}
+
+\hypertarget{example-analysis}{%
+\section{Example Analysis}\label{example-analysis}}
+
+\pagebreak
+
+\hypertarget{references}{%
+\section{References}\label{references}}
+
+
+\end{document}

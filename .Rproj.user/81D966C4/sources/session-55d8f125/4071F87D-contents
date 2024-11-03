@@ -1,0 +1,178 @@
+---
+title: "Visual Partitioning for Multivariate Models: An Approach for Identifying and Visualizing Complex Multivariate Datasets"
+shorttitle: "Visual Partitioning"
+author: 
+  - name      : "Dustin A. Fife"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    address       : "201 Mullica Hill Road
+                    Glassboro, NJ 08028"
+    email         : "fife.dustin@gmail.com"
+  - name      : "Jorge L. Mendoza"
+    affiliation   : "2"
+
+affiliation:
+  - id            : "1"
+    institution   : "Rowan University"
+  - id            : "2"
+    institution   : "University of Oklahoma"    
+abstract: |
+  Users of statistics quite frequently use multivariate models to make conditional inferences (e.g., stress affects depression, after controlling for gender). These inferences are often done without adequately considering (or understanding) the assumptions one makes when claiming these inferences. Of particular concern is when there are unmodeled nonlinear and/or interaction effects. With such unmodeled multiplicative effects, inferences based on a main effects model are not merited. On the other hand, when these effects are properly modeled, complex multivariate analyses can be "partitioned" into distinct components to ease interpretation. In this paper, we highlight when conditional inferences are contaminated by other features of the model and identify the conditions under which effects can be partitioned. We also reveal a strategy for partitioning multivariate effects into uncontaminated blocks using visualizations. This approach simplifies multivariate analyses immensely, without oversimplifying the analysis.
+documentclass     : "apa6"
+classoption       : "doc"
+output            : 
+  papaja::apa6_pdf:
+    number_sections: false
+figsintext     : true
+bibliography: 
+- all_references.bib
+header-includes:
+- \usepackage{amsmath}
+- \usepackage{tikz}
+- \usetikzlibrary{shapes.geometric,arrows, positioning}
+- \usepackage[LGRgreek]{mathastext}
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, note=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE, note=FALSE, cache=TRUE)
+options(knitr.kable.NA = '')
+require(tidyverse)
+require(flexplot)
+```
+
+# Introduction
+
+* Suppose we were to peruse journal and find the results shown in Table \@ref(tab:anovatab)
+  * How are we to make sense of this?
+  * Does health increase ideation or decrease it?
+  * What is the nature of the interaction?
+  
+```{r anovatab}
+require(flexplot)
+require(tidyverse)
+require(patchwork)
+mod = lm(ideation~stress + I(stress^2) + health + friend_ideation * depression, data=ideation)
+aovtab = data.frame(anova(mod))
+aovtab$F.value = round(aovtab$F.value, digits=2)
+row.names(aovtab) = gsub("friend_ideation", "friend ideation", row.names(aovtab))
+row.names(aovtab)[6] = "friend ideation $ \\times $ depression"
+row.names(aovtab)[2] = "$\\text{stress}^2$"
+aovtab$Pr..F. = scales::pvalue(aovtab$Pr..F.)
+aovtab$F.value[7] = ""
+aovtab$Pr..F.[7] = ""
+papaja::apa_table(aovtab, 
+  caption = "ANOVA Summary Table of the Suicide Ideation Analysis", 
+  digits=2, row.names=T, 
+  escape=FALSE,
+  align = c("l", rep("c", times=ncol(aovtab))),
+  col.names = c("", "DF", "SS", "MS", "F", "p"))
+```
+
+* ANOVA summary tables are painfully uninformative
+* Even if we knew direction/nature, there's still the multivariate nature to contend with
+  * What can be interpreted in isolation? 
+  * What must be interpreted multivariately?
+  * Can any variable be interpreted in isolation?
+* This paper introduces "visual partitions"
+  * Supplement to ANOVA summary tables
+  * Visuals that succinctly communicate the nature of a multivariate analysis
+  * These partitions can be interpreted in relative isolation without worrying about misinterpreting multivariate model
+
+# Tools
+
+* Flexplot (also mention here the simple slopes analysis)
+* Partial Residual Plots/AVPs
+* Marginal Plots
+
+# Rules and Assumptions and Visual Partitions
+
+* We assume researcher is using linear models
+  * these include t-tests, ANOVAs, Factorial ANOVAs, ANCOVAs, and multiple regression
+  * These are all subsumed by the linear model (Cohen)
+    * And, with minor modifications, mixed models, generalized linear models, SEMs, etc. 
+* Assume for each analysis there is a "true" model
+  * Researcher may or may not have discovered the true model
+  * May instead have a "hypothesized model"
+* Suppose "true model" only contains main effects
+  * Simple bivariate plots may be misleading (e.g., suppressor effects)
+  * Rather, an AVP or a PRP would be appropriate
+  * But, then marginal effects can be visualized in isolation
+    * Reason: The effect of this variable doesn't depend on other the values of other variables in the model
+      * Because there's no interaction
+* Suppose "true model" contains both main effects and nonlinear effects
+  * Simple bivariate and linear plots will be misleading
+  * AVPs (or PRPs) must include the nonlinear component
+  * But the linear+nonlinear effects can be interpreted in isolation
+    * Again, because there are no interactions
+* Suppose "true model" contains interaction effects
+  * Interpreting main effects of interacting variables will be misleading
+    * It is "contaminated" by the other variable in the model
+  * Must visualize the two together (as part of AVP or PRP)
+  * This extends to three+ way interactions (all variables must be visualized together)
+  * But visual only needs to include these variables
+    * Because they don't interact with other variables
+* In summary
+  * a variable with only main effects can be interpreted as a PRP
+  * A variable containing nonlinear effects can be interpreted in isolation, provided we visualize the nonlinear effect
+  * Variables that interact must be visualized together
+  
+## Visual Partitions and Linear Model Assumptions
+
+* Linear models make several key assumptions:
+  * Normality
+  * Homoscedasticity
+  * Additivity
+    * Meaning that all main effects modeled contain only simple main effects
+* Notice the rules above are closely aligned with the assumptions of the linear model 
+  * we only visualize main effects when the assumption of additivity has been met
+  * otherwise we modify visuals to include 
+  
+# Visual Partitions in Confirmatory Research
+
+* Conditions for confirmatory research
+  * Sample size, hypothesis, and model are specified in advance
+  * Only one test performed (or corrected for multiple comparisons)
+  * No deviation from model plan
+  * Likely preregistered
+    * It's very rare that psychological research is confirmatory
+* Visual partitions play different roles in confirmatory versus exploratory research
+  * In confirmatory research, they communicate the model
+    * And, indirectly, play a diagnostic role
+      * i.e., when visuals are presented, they might highlight nonlinearities
+      * But, if that's the case, the analysis is no longer confirmatory
+
+# Visual Partitions in Exploratory Research
+
+* Most research is exploratory (or at least "rough confirmatory")
+  * Hypotheses are often specified in advance, but not the model and/or sample size
+* Because of researcher DF, it's difficult to tell whether results are found because of signal, or because of the activity of searching
+  * p-values have no probabilistic meaning (and should not be reported)
+    * ANOVA summary table is, at best, misleading
+      * p-values have no probablistic meaning
+    * Rather, a table of effect sizes (show example)
+  * Effect sizes/visuals should be interpreted provisionally
+  * Process shifts from confirming trends to *searching for trends*
+    * With the eventual goal of confirmation in a later study
+
+
+## Five Step Strategy
+
+Goal of this strategy is to discover true nature of relationships
+  * whether variables have main effects, nonlinear effects, and/or interact with other variables
+  * We pay special attention to nonlinear/interaction effects
+
+1. Identify nonlinear effects with Flexplot and loess (or quadratic) lines. 
+2. Identify interactions with marginal plots. 
+3. Model (and optionally test) for nonlinear/interactive effects found in Step 2.
+4. Use PRPs to perform residual analysis from the model in Step 3.
+5. Visualize final model partitions using PRPs. 
+
+# Example Analysis
+  
+  
+
+
+
+\pagebreak
+
+# References

@@ -1,0 +1,5 @@
+"0","knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE, note=FALSE, cache=TRUE)"
+"0","options(tinytex.verbose = TRUE)"
+"0","options(knitr.kable.NA = '')"
+"0","require(tidyverse)"
+"0","require(flexplot)"

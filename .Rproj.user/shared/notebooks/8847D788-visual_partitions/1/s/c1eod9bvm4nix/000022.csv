@@ -1,0 +1,5 @@
+"0",""
+"0","a = flexplot(ideation~friend_ideation | depression, data=ideation, method=""lm"") + labs(x=""Friend's Suicide Ideation"", y=""Self Suicide Ideation"")"
+"0","b = flexplot(ideation~depression + friend_ideation, data=ideation, method=""lm"") + labs(x=""Depression"", y=""Self Suicide Ideation"")"
+"0","require(patchwork)"
+"0","a+b + plot_layout(nrow=2)"

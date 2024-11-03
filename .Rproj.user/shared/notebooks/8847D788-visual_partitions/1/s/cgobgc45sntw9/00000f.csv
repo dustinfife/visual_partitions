@@ -1,0 +1,5 @@
+"0","a = marginal_plot(flexplot(y3~x | z + w, data=d, method=""lm"","
+"0","                           labels=list(""x"" = c(""low"", ""medium"", ""high""),"
+"0","                                       ""z"" = c(""low"", ""medium"", ""high"")))+ "
+"0","                    labs(x=""x"", y=""y""))"
+"0","a"

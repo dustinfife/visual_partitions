@@ -1,0 +1,12 @@
+`
+disorganized =~ spq1 + spq2 + abc1 + abc2 + abc3 + abc4 + abc5
+
+`
+
+paste0("abc", 1:5, collapse=" + ")
+
+
+partial_residual_plot(ptsd~shots.taken | superpower, data=avengers, 
+      lm_formula = ptsd~shots.taken + minutes.fighting + superpower, 
+      added_term = ~shots.taken + superpower) + 
+  labs(y = "PTSD | Minutes Fighting", x="Shots Taken")

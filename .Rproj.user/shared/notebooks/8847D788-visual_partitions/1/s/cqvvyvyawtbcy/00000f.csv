@@ -1,0 +1,27 @@
+"0","require(flexifiers)"
+"2","Loading required package: flexifiers
+"
+"2","
+Attaching package: ‘flexifiers’
+
+"
+"2","The following objects are masked from ‘package:flexplot’:
+
+    modify_points, small
+
+"
+"0","mod = lm(ideation~depression+friend_ideation, data=ideation)"
+"0","a = partial_residual_plot(ideation~depression, "
+"0","             data=ideation,"
+"0","             added_term = ~depression, "
+"0","             model = mod) +"
+"0","  labs(y=""Suicide Ideation | Friend Ideation"", x= ""Depression"")"
+"0","mod = lm(ideation~depression*friend_ideation, data=ideation)"
+"0","b = partial_residual_plot(ideation~depression|friend_ideation, "
+"0","             data=ideation,"
+"0","             added_term = ~depression*friend_ideation, "
+"0","             model = mod) + "
+"0","  labs(y=""Suicide Ideation"", x= ""Depression"") +"
+"0","  theme(strip.text.x = element_text(size = 10))"
+"0","b = b %>% flexifiers::modify_labels(col_panels=""Friend Ideation"")"
+"0","a+b + plot_layout(widths=c(1,2))"

@@ -1,0 +1,3 @@
+devtools::install_github("dustinfife/flexplot")
+2
+flexplot(ptsd~injuries, data=avengers)
